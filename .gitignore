@@ -1,0 +1,9 @@
+latent_diffusion.egg-info
+*.bat
+__pycache__
+*/**/__pycache__
+models/**
+*.ckpt
+.vscode/**
+model_cache/*
+output/*

@@ -1,0 +1,21 @@
+name: mf-trainer
+dependencies:
+  - python=3.8.10
+  - pip=20.3
+  - numpy=1.23.5
+  - pip:
+    - --extra-index-url "https://download.pytorch.org/whl/cu118"
+    - torch==2.0.0+cu118
+    - torchvision==0.15.0+cu118
+    - transformers==4.29.1
+    - diffusers==0.16.1
+    - https://github.com/acpopescu/bitsandbytes/releases/download/v0.38.0-win0/bitsandbytes-0.38.1-py3-none-any.whl # Built for CUDA 11.6. Make sure both are installed
+    - pytorch-lightning==1.6.5
+    - albumentations==1.1.0
+    - omegaconf==2.1.1
+    - setuptools==59.5.0
+    - pillow==9.0.1
+    - lion-pytorch
+    - xformers==0.0.19
+    - accelerate==1.3.0
+    - einops==0.3.0

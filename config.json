@@ -1,0 +1,44 @@
+{
+    "comment": "This is the training config for MFTrainer",
+    "models": {
+        "vae": {
+            "mode": "train",
+            "location": "gpu",
+            "data_type": "bfloat16",
+            "cpu_when_idle": true,
+            "train_encoder": false,
+            "train_decoder": true,
+            "optimizer": {
+                "type": "lion-pytorch",
+                "lr": 1e-6
+            },
+            "optimizations": {
+                "slicing": true
+            }
+        }
+    },
+    "hardware": {
+        "gpu": {
+            "type": "cuda",
+            "gpuid": 0
+        }
+    },
+    "datasets": {
+        "main": {
+            "class": "mf.datasets.dataset.MFDataset",
+            "size": 512,
+            "subfolder": ""
+        }
+    },
+    "tasks": [
+        {
+            "type": "vae_training",
+            "dataset": "main"
+        },
+        {
+            "type": "save",
+            "models": ["vae"],
+            "data_type": "float32"
+        }
+    ]
+}
