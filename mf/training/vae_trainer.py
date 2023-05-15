@@ -34,9 +34,10 @@ class VAETraining:
         vae.set_use_memory_efficient_attention_xformers(True)
 
         optimizer = vae_wrapper.create_optimizer()
-        steps_pbar = tqdm(range(len(dataloader) * (self.repeats + 1)), position=0, leave=False, dynamic_ncols=True)
+        steps_pbar = tqdm(range(len(dataloader) * (self.repeats + 1) * self.batch_size), position=0, leave=False, dynamic_ncols=True)
         for _ in range(self.repeats + 1):
             accum_loss = None
+            accumed_steps = 0
             for step, batch in enumerate(dataloader):
                 image_tensor = batch["image"].to(memory_format=torch.contiguous_format,dtype=vae_wrapper.get_datatype()).to(vae_wrapper.get_device())
                 # Forward pass
@@ -48,19 +49,26 @@ class VAETraining:
                     accum_loss = loss
                 else:
                     accum_loss += loss
+                accumed_steps += 1
 
                 if (step + 1) % self.accumulation_steps == 0:
                     accum_loss.backward()
                     optimizer.step()
                     optimizer.zero_grad()
+                    steps_pbar.set_postfix({"loss": accum_loss.detach().item()})
+                    steps_pbar.update(self.accumulation_steps * self.batch_size)
                     accum_loss = None
-
-                steps_pbar.set_postfix({"loss": loss.detach().item()})
-                steps_pbar.update(1)
+                    accumed_steps = 0
 
             # Can happen when steps is not divisible by accumulation steps
-            optimizer.step()
-            optimizer.zero_grad()
+            if accum_loss is not None:
+                accum_loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                steps_pbar.set_postfix({"loss": accum_loss.detach().item()})
+                steps_pbar.update(accumed_steps)
+                accum_loss = None
+            self.dataset.next_epoch() # shuffle as a repeat can be considered an epoch
 
         # Done with the model. Bring it back to the CPU
         vae_wrapper.set_model_idle()
