@@ -1,6 +1,6 @@
 import mf.model_utils as utils
 import logging
-import os
+import os, shutil
 
 class ModelHolder:
     def __init__(self, vae=None, text_encoder=None, tokenizer=None, unet=None, scheduler=None):
@@ -52,13 +52,19 @@ class ModelHolder:
         else:
             return self.scheduler
     
-    def save_models(self, path, which_models, datatype="float32"):
+    def save_models(self, path, which_models, datatype="float32", version=None):
         dtype = utils.parse_datatype(datatype)
         if "vae" in which_models:
             self.vae.get_model().to(dtype=dtype).save_pretrained(os.path.join(path, "vae"))
+            if version is not None:
+                in_dir = os.path.join(path, "vae")
+                out_dir = os.path.join(path, "vae_" + version)
+                os.makedirs(out_dir)
+                for file in os.listdir(in_dir):
+                    shutil.copyfile(os.path.join(in_dir, file), os.path.join(out_dir, file))
 
 
-class ModelManager:
+class MFModelWrapper:
     def __init__(self, path, hardware, type, training_config):
         assert training_config["mode"] in ["train", "eval"]
         self.path = path
@@ -86,6 +92,8 @@ class ModelManager:
             logging.debug(f"Moving module {self.type} from cpu to {self.training_config['location']}")
             self.model.to(self.device, dtype=self.dtype)
             self.model_is_idle = False
+        if self.model.dtype != self.dtype:
+            self.model.to(dtype=self.dtype)
         return self.model
     
     def set_model_idle(self):
@@ -108,7 +116,7 @@ class ModelManager:
     def create_optimizer(self):
         raise NotImplementedError()
 
-class VAEManager(ModelManager):
+class VAEManager(MFModelWrapper):
     def __init__(self, model_path, hardware, training_config):
         super().__init__(model_path, hardware, "vae", training_config)
         validate_optimizer(training_config)

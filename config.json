@@ -25,20 +25,35 @@
     },
     "datasets": {
         "main": {
-            "class": "mf.datasets.dataset.MFDataset",
-            "size": 512,
-            "subfolder": ""
+            "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
+            "train_size": 512,
+            "resize": -1,
+            "subfolder": "",
+            "shuffle_each_epoch": true
         }
     },
     "tasks": [
         {
-            "type": "vae_training",
-            "dataset": "main"
-        },
-        {
-            "type": "save",
-            "models": ["vae"],
-            "data_type": "float32"
+            "type": "loop",
+            "num_loops": 1,
+            "tasks": [
+                {
+                    "type": "vae_training",
+                    "dataset": "main",
+                    "training_params": {
+                        "batch_size": 1,
+                        "gradient_accumulation_steps": 3,
+                        "dataset_workers": 4,
+                        "repeats": 4
+                    }
+                },
+                {
+                    "type": "save",
+                    "models": ["vae"],
+                    "data_type": "float32",
+                    "save_versions": true
+                }
+            ]
         }
     ]
 }

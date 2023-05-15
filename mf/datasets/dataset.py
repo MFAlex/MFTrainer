@@ -4,16 +4,27 @@ import PIL.Image as Image
 import albumentations
 import cv2
 import numpy as np
+from torch.utils.data import Dataset
+from torchvision import transforms
 
-class MFDataset:
+class MFDataset(Dataset):
     def __init__(self, global_path, config):
         assert "size" in config
-        self.path = os.path.join(global_path, config["subfolder"])
+        if "subfolder" in config and config["subfolder"] != "":
+            self.path = os.path.join(global_path, config["subfolder"])
+        else:
+            self.path = global_path
         allowed_extensions = [".png", ".jpg", "webp"]
         files = [file for file in os.listdir(self.path) if file[-4:].lower() in allowed_extensions]
         img_size = config["size"]
         self.image_rescaler = albumentations.SmallestMaxSize(max_size=img_size, interpolation=cv2.INTER_AREA)
         self.crop_algo = albumentations.CenterCrop(height=img_size, width=img_size)
+        self.transformer = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize([0.0], [0.5])
+            ]
+        )
 
         self.data = []
         print(f"Preloading dataset of {len(files)} images in '{self.path}'")
@@ -27,11 +38,17 @@ class MFDataset:
             self.data.append(image)
 
 
-    def get_num_items(self):
+    def __len__(self):
         return len(self.data)
+
+    def __getitem__(self, i):
+        img = self.data[i]
+        f32_img = (img/127.5 - 1.0).astype(np.float32)
+        image_tensor = self.transformer(f32_img)
+
+        data = dict()
+        data["image"] = image_tensor
+        return data
     
-    def get_image(self, i):
-        return self.data[i]
-    
-    def get_prompt(self, i):
-        raise NotImplementedError("This dataset does not use prompts")
+    def next_epoch(self):
+        pass

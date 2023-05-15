@@ -3,6 +3,7 @@ from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler
 from transformers import CLIPTextModel, CLIPTokenizer
 import importlib
 import torch
+import open_clip.model as openclipmodel
 
 def load_model(path, components = ["vae", "text_encoder", "tokenizer", "unet", "scheduler"]):
     assert os.path.exists(path)
@@ -19,6 +20,12 @@ def load_model(path, components = ["vae", "text_encoder", "tokenizer", "unet", "
             model = UNet2DConditionModel.from_pretrained(path, subfolder="unet")
         elif component == "scheduler":
             model = DDPMScheduler.from_pretrained(path, subfolder="scheduler")
+        elif component == "openclip":
+            #model = factory.load_openai_model(os.path.join(path, "text_encoder", "pytorch_model.bin"))
+            state_dict = torch.load(os.path.join(path, "text_encoder", "pytorch_model.bin"), map_location="cpu")
+            model = openclipmodel.build_model_from_openai_state_dict(state_dict)
+            print(model)
+            
         assert model != None, "model \"" + component + "\" unrecognised or not present at the given path"
         outputs.append(model)
     return outputs

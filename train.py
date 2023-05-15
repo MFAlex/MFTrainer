@@ -8,6 +8,28 @@ import argparse
 
 from mf.training.vae_trainer import VAETraining
 
+def do_task(task, model_holder, datasets, out_model_path):
+    try:
+        print(f"** EXECUTING TASK {task['type']} **")
+        if task["type"] == "vae_training":
+            VAETraining(model_holder, datasets[task["dataset"]], task["training_params"]).train()
+        elif task["type"] == "save":
+            to_save = task["models"]
+            dtype = task["data_type"] if "data_type" in task else "float32"
+            version_str = None
+            if "save_versions" in task and task["save_versions"]:
+                import datetime
+                version_str = datetime.datetime.now().strftime("%d_%b__%H_%M")
+            model_holder.save_models(out_model_path, to_save, dtype, version=version_str)
+        elif task["type"] == "loop":
+            subtasks = task["tasks"]
+            count = task["num_loops"]
+            for _ in range(count):
+                for t in subtasks:
+                    do_task(t, model_holder, datasets, out_model_path)
+    except KeyboardInterrupt:
+        print(f"Interrupt command received. Interrupting current stage of type '{task['type']}'")
+
 def train(config_file_path, model_path, out_model_path, dataset_path):
     # Initialise some important state variables
     model_holder = models_manager.ModelHolder()
@@ -32,23 +54,17 @@ def train(config_file_path, model_path, out_model_path, dataset_path):
     for model in needed_models:
         if model == 'vae':
             model_holder._set("vae", models_manager.VAEManager(model_path, hardware, config["models"][model]))
+        elif model == 'openclip':
+            model = utils.load_model(model_path, ["openclip"])
+            print(model)
 
     datasets = dict()
     for key in config["datasets"].keys():
         datasets[key] = utils.construct_dataset_from_config(config["datasets"][key], dataset_path)
 
     print("Preparations complete. Let's do this!")
-    for i, stage in enumerate(config["tasks"]):
-        try:
-            print(f"** EXECUTING TASK #{i} **")
-            if stage["type"] == "vae_training":
-                VAETraining(model_holder, datasets[stage["dataset"]]).train()
-            elif stage["type"] == "save":
-                to_save = stage["models"]
-                dtype = stage["data_type"]
-                model_holder.save_models(out_model_path, to_save, dtype)
-        except KeyboardInterrupt:
-            print(f"Interrupt command received. Interrupting current stage of type '{stage['type']}'")
+    for stage in config["tasks"]:
+        do_task(stage, model_holder, datasets, out_model_path)
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="MFTrainer command line options")
