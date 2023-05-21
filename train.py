@@ -6,21 +6,26 @@ import mf.model_utils as utils
 import os
 import argparse
 
-from mf.training.vae_trainer import VAETraining
+from mf.training.vae_trainer import VAETraining, VAE_LearingRate, VAE_Validation
 
 def do_task(task, model_holder, datasets, out_model_path):
     try:
         print(f"** EXECUTING TASK {task['type']} **")
         if task["type"] == "vae_training":
             VAETraining(model_holder, datasets[task["dataset"]], task["training_params"]).train()
+        elif task["type"] == "vae_find_learning_rate":
+            VAE_LearingRate(model_holder, datasets[task["dataset"]], task["training_params"]).find()
+        elif task["type"] == "vae_validation":
+            VAE_Validation(model_holder, datasets[task["dataset"]]).validate()
         elif task["type"] == "save":
             to_save = task["models"]
             dtype = task["data_type"] if "data_type" in task else "float32"
+            with_ckpt = task["also_save_ckpt"] if "also_save_ckpt" in task else False
             version_str = None
             if "save_versions" in task and task["save_versions"]:
                 import datetime
                 version_str = datetime.datetime.now().strftime("%d_%b__%H_%M")
-            model_holder.save_models(out_model_path, to_save, dtype, version=version_str)
+            model_holder.save_models(out_model_path, to_save, dtype, version=version_str, ckpt=with_ckpt)
         elif task["type"] == "loop":
             subtasks = task["tasks"]
             count = task["num_loops"]

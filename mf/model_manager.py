@@ -1,4 +1,5 @@
 import mf.model_utils as utils
+import mf.conversion_utils as converter
 import logging
 import os, shutil
 
@@ -52,10 +53,12 @@ class ModelHolder:
         else:
             return self.scheduler
     
-    def save_models(self, path, which_models, datatype="float32", version=None):
+    def save_models(self, path, which_models, datatype="float32", version=None, ckpt=False):
         dtype = utils.parse_datatype(datatype)
         if "vae" in which_models:
             self.vae.get_model().to(dtype=dtype).save_pretrained(os.path.join(path, "vae"))
+            if ckpt:
+                converter.convert_vae(os.path.join(path, "vae"), os.path.join(path, "vae", "vae.ckpt"))
             if version is not None:
                 in_dir = os.path.join(path, "vae")
                 out_dir = os.path.join(path, "vae_" + version)
@@ -76,6 +79,7 @@ class MFModelWrapper:
         self.device = hardware[training_config["location"]]
         self.dtype = utils.parse_datatype(training_config["data_type"])
         self.idle_device = hardware["cpu"]
+        self.optimizer = None
     
     def get_model(self):
         if not self.loaded_model:
@@ -95,6 +99,12 @@ class MFModelWrapper:
         if self.model.dtype != self.dtype:
             self.model.to(dtype=self.dtype)
         return self.model
+    
+    def get_optimizer(self):
+        # TODO save/load optimizer states?
+        if self.optimizer is None:
+            self.optimizer = self.create_optimizer()
+        return self.optimizer
     
     def set_model_idle(self):
         logging.debug(f"Moving module {self.type} from {self.training_config['location']} to cpu")
@@ -137,16 +147,18 @@ class VAEManager(MFModelWrapper):
                 model.decoder.eval()
                 model.decoder.train = lambda x: x
     
-    def create_optimizer(self):
+    def create_optimizer(self, model=None, lr_override=None):
+        if model is None:
+            model = self.model
         train_enc = self.training_config["train_encoder"]
         train_dec = self.training_config["train_decoder"]
         if train_enc and train_dec:
-            params = self.model.parameters()
+            params = model.parameters()
         elif train_enc:
-            params = self.model.encoder.parameters()
+            params = model.encoder.parameters()
         elif train_dec:
-            params = self.model.decoder.parameters()
-        return make_optimizer(params, self.training_config)
+            params = model.decoder.parameters()
+        return make_optimizer(params, self.training_config, lr_override)
     
     def do_train_encoder(self):
         return self.training_config["train_encoder"]
@@ -154,10 +166,10 @@ class VAEManager(MFModelWrapper):
     def do_train_decoder(self):
         return self.training_config["train_decoder"]
 
-def make_optimizer(params, config):
+def make_optimizer(params, config, lr_override=None):
     optimizer_config = config["optimizer"]
     optimizer_type = optimizer_config["type"]
-    lr = optimizer_config["lr"]
+    lr = lr_override or optimizer_config["lr"]
     weight_decay = optimizer_config["weight_decay"] if "weight_decay" in optimizer_config else 0.0
     if optimizer_type in ["8bit-adamw", "lion", "8bit-lion", "8bit-adam"]:
         import bitsandbytes as bnb

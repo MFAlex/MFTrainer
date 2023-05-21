@@ -16,7 +16,7 @@ class MFVAEDataset(Dataset):
             self.path = global_path
         allowed_extensions = [".png", ".jpg", "webp"]
         self.files = [file for file in os.listdir(self.path) if file[-4:].lower() in allowed_extensions]
-        self.shuffle_each_epoch = config["shuffle_each_epoch"]
+        self.shuffle_each_epoch = config["shuffle_each_epoch"] if "shuffle_each_epoch" in config else False
         self.resize = config["resize"]
         self.train_size = config["train_size"]
         assert self.resize < 1 or self.resize >= self.train_size, "Cannot resize an image to smaller than the training size"
@@ -55,11 +55,11 @@ class MFVAEDataset(Dataset):
         smallest_length = min(img.shape[0], img.shape[1])
         if self.resize > 1:
             # Resize to this many pixels
-            smallest_length = max(smallest_length / self.resize, self.train_size)
+            smallest_length = int(max(smallest_length / self.resize, self.train_size))
             img = albumentations.SmallestMaxSize(max_size=smallest_length, interpolation=cv2.INTER_AREA)(image=img)["image"]
         elif self.resize > 0:
             # If from 0-1, treat as a ratio, but make sure it's not too small to train on
-            smallest_length = max(smallest_length / self.resize, self.train_size)
+            smallest_length = int(max(smallest_length / self.resize, self.train_size))
             img = albumentations.SmallestMaxSize(max_size=smallest_length, interpolation=cv2.INTER_AREA)(image=img)["image"]
         return img
 
@@ -93,3 +93,9 @@ class SmartMFVAEDataset(MFVAEDataset):
         r = dict()
         r["image"] = best
         return r
+
+class CenterMFVAEDataset(MFVAEDataset):
+    def __init__(self, global_path, config):
+        config["shuffle_each_epoch"] = False
+        super().__init__(global_path, config)
+        self.cropper = albumentations.CenterCrop(height=self.train_size, width=self.train_size)

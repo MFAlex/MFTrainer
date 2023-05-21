@@ -7,3 +7,4 @@ models/**
 .vscode/**
 model_cache/*
 output/*
+test/*

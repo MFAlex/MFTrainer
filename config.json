@@ -10,7 +10,8 @@
             "train_decoder": true,
             "optimizer": {
                 "type": "lion-pytorch",
-                "lr": 1e-6
+                "weight_decay": 0.100,
+                "lr": 5e-5
             },
             "optimizations": {
                 "slicing": true
@@ -25,33 +26,55 @@
     },
     "datasets": {
         "main": {
-            "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
-            "train_size": 512,
-            "resize": -1,
-            "subfolder": "",
+            "class": "mf.datasets.dataset.ConcatDataset",
+            "datasets": [
+                {
+                    "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
+                    "train_size": 480,
+                    "resize": 0.5,
+                    "subfolder": "HAAP sample"
+                },
+                {
+                    "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
+                    "train_size": 480,
+                    "resize": -1,
+                    "subfolder": "MFQ"
+                }
+            ],
             "shuffle_each_epoch": true
+        },
+        "lr_finding": {
+            "class": "mf.datasets.vaedataset.CenterMFVAEDataset",
+            "train_size": 640,
+            "resize": -1,
+            "subfolder": "MFQ_lr"
         }
     },
     "tasks": [
         {
             "type": "loop",
-            "num_loops": 1,
+            "num_loops": 3,
             "tasks": [
+                {
+                    "type": "vae_validation",
+                    "dataset": "lr_finding"
+                },
                 {
                     "type": "vae_training",
                     "dataset": "main",
                     "training_params": {
-                        "batch_size": 1,
-                        "gradient_accumulation_steps": 3,
+                        "batch_size": 2,
+                        "gradient_accumulation_steps": 1,
                         "dataset_workers": 4,
-                        "repeats": 4
+                        "repeats": 0
                     }
                 },
                 {
                     "type": "save",
                     "models": ["vae"],
                     "data_type": "float32",
-                    "save_versions": true
+                    "save_versions": true,
+                    "also_save_ckpt": true
                 }
             ]
         }

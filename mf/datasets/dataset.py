@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 from torchvision import transforms
+from mf.model_utils import construct_dataset_from_config
+import random
 
 class MFDataset(Dataset):
     def __init__(self, global_path, config):
@@ -52,3 +54,28 @@ class MFDataset(Dataset):
     
     def next_epoch(self):
         pass
+
+class ConcatDataset(Dataset):
+    def __init__(self, global_path, config):
+        datasets = config["datasets"]
+        self.shuffle_each_epoch = config["shuffle_each_epoch"] if "shuffle_each_epoch" in config else False
+        assert isinstance(datasets, list)
+        assert len(datasets) > 0
+        self.datasets = [None] * len(datasets)
+        self.data = []
+        for i, dataset in enumerate(datasets):
+            d = construct_dataset_from_config(dataset, global_path)
+            self.datasets[i] = d
+            for j in range(len(d)):
+                self.data.append((i, j))
+    
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, i):
+        entry = self.data[i]
+        return self.datasets[entry[0]][entry[1]]
+    
+    def next_epoch(self):
+        if self.shuffle_each_epoch:
+            random.shuffle(self.data)
