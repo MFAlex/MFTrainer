@@ -55,11 +55,11 @@ class MFVAEDataset(Dataset):
         smallest_length = min(img.shape[0], img.shape[1])
         if self.resize > 1:
             # Resize to this many pixels
-            smallest_length = int(max(smallest_length / self.resize, self.train_size))
+            smallest_length = int(max(self.resize, self.train_size))
             img = albumentations.SmallestMaxSize(max_size=smallest_length, interpolation=cv2.INTER_AREA)(image=img)["image"]
         elif self.resize > 0:
             # If from 0-1, treat as a ratio, but make sure it's not too small to train on
-            smallest_length = int(max(smallest_length / self.resize, self.train_size))
+            smallest_length = int(max(smallest_length * self.resize, self.train_size))
             img = albumentations.SmallestMaxSize(max_size=smallest_length, interpolation=cv2.INTER_AREA)(image=img)["image"]
         return img
 
