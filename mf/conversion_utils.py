@@ -26,6 +26,8 @@ import re
 
 import torch
 
+from transformers import CLIPTokenizer
+
 
 # =================#
 # UNet Conversion #
@@ -287,6 +289,13 @@ def convert_all(model_path: str, checkpoint_path: str, half: bool):
     vae_path = osp.join(model_path, "vae", "diffusion_pytorch_model.bin")
     text_enc_path = osp.join(model_path, "text_encoder", "pytorch_model.bin")
 
+    vocab_path = osp.join(model_path, "tokenizer", "vocab.json")
+    merges_path = osp.join(model_path, "tokenizer", "merges.txt")
+    tokenizer = CLIPTokenizer(vocab_path, merges_path)
+    tokenizer_dict = tokenizer.state_dict()
+    tokenizer_dict = {"cond_stage_model.tokenizer." + k: v for k, v in tokenizer_dict.items()}
+
+
     # Convert the UNet model
     unet_state_dict = torch.load(unet_path, map_location="cpu")
     unet_state_dict = convert_unet_state_dict(unet_state_dict)
@@ -313,7 +322,7 @@ def convert_all(model_path: str, checkpoint_path: str, half: bool):
         text_enc_dict = {"cond_stage_model.transformer." + k: v for k, v in text_enc_dict.items()}
 
     # Put together new checkpoint
-    state_dict = {**unet_state_dict, **vae_state_dict, **text_enc_dict}
+    state_dict = {**unet_state_dict, **vae_state_dict, **text_enc_dict, **tokenizer_dict}
     if half:
         state_dict = {k: v.half() for k, v in state_dict.items()}
     state_dict = {"state_dict": state_dict}
