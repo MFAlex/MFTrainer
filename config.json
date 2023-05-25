@@ -4,10 +4,8 @@
         "vae": {
             "mode": "train",
             "location": "gpu",
-            "data_type": "bfloat16",
+            "data_type": "float32",
             "cpu_when_idle": true,
-            "train_encoder": false,
-            "train_decoder": true,
             "optimizer": {
                 "type": "lion-pytorch",
                 "weight_decay": 0.100,
@@ -26,21 +24,9 @@
     },
     "datasets": {
         "main": {
-            "class": "mf.datasets.dataset.ConcatDataset",
-            "datasets": [
-                {
-                    "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
-                    "train_size": 480,
-                    "resize": 0.5,
-                    "subfolder": "HAAP sample"
-                },
-                {
-                    "class": "mf.datasets.vaedataset.SmartMFVAEDataset",
-                    "train_size": 480,
-                    "resize": -1,
-                    "subfolder": "MFQ"
-                }
-            ],
+            "class": "mf.datasets.diffusiondataset.MFBucketedDataset",
+            "subfolder": ["MFQ", "HAAP sample"],
+            "buckets": ["512x512", "384x768", "768x384"],
             "shuffle_each_epoch": true
         },
         "lr_finding": {
@@ -66,7 +52,9 @@
                         "batch_size": 2,
                         "gradient_accumulation_steps": 1,
                         "dataset_workers": 4,
-                        "repeats": 0
+                        "repeats": 0,
+                        "train_encoder": false,
+                        "train_decoder": true
                     }
                 },
                 {

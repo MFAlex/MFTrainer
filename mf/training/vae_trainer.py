@@ -18,6 +18,8 @@ class VAETraining:
         self.accumulation_steps = training_params["gradient_accumulation_steps"]
         self.num_dataset_workers = training_params["dataset_workers"]
         self.repeats = training_params["repeats"] if "repeats" in training_params else 0
+        self.train_enc = training_params["train_encoder"]
+        self.train_dec = training_params["train_decoder"]
 
     def train(self):
         self.dataset.next_epoch()
@@ -32,18 +34,21 @@ class VAETraining:
         vae_wrapper = self.models.get_vae()
         vae = vae_wrapper.get_model()
 
+        vae.encoder.train() if self.train_enc else vae.encoder.eval()
+        vae.decoder.train() if self.train_dec else vae.decoder.eval()
+
         # This literally won't work without xformers for some reason
         vae.set_use_memory_efficient_attention_xformers(True)
 
-        optimizer = vae_wrapper.get_optimizer()
-        steps_pbar = tqdm(range(len(dataloader) * (self.repeats + 1) * self.batch_size), position=0, leave=False, dynamic_ncols=True)
+        optimizer = vae_wrapper.get_optimizer(train_enc=self.train_enc, train_dec=self.train_dec)
+        steps_pbar = tqdm(range(len(self.dataset) * (self.repeats + 1)), position=0, leave=False, dynamic_ncols=True)
         for _ in range(self.repeats + 1):
             accum_loss = None
             accumed_steps = 0
             for step, batch in enumerate(dataloader):
                 image_tensor = batch["image"].to(memory_format=torch.contiguous_format,dtype=vae_wrapper.get_datatype()).to(vae_wrapper.get_device())
                 # Forward pass
-                model_pred = self._encode_and_decode(image_tensor, vae_wrapper.do_train_encoder(), vae_wrapper.do_train_decoder())
+                model_pred = self._encode_and_decode(image_tensor, self.train_enc, self.train_dec)
 
                 # Calculate loss
                 loss = F.mse_loss(model_pred.float(), image_tensor.float(), reduction="mean")
@@ -51,14 +56,14 @@ class VAETraining:
                     accum_loss = loss
                 else:
                     accum_loss += loss
-                accumed_steps += 1
+                accumed_steps += batch["image"].shape[0]
 
                 if (step + 1) % self.accumulation_steps == 0:
                     accum_loss.backward()
                     optimizer.step()
                     optimizer.zero_grad(set_to_none=True)
                     steps_pbar.set_postfix({"loss": accum_loss.detach().item()})
-                    steps_pbar.update(self.accumulation_steps * self.batch_size)
+                    steps_pbar.update(accumed_steps)
                     accum_loss = None
                     accumed_steps = 0
 

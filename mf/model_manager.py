@@ -108,6 +108,7 @@ class MFModelWrapper:
     
     def set_model_idle(self):
         logging.debug(f"Moving module {self.type} from {self.training_config['location']} to cpu")
+        self.model.eval()
         self.model.to(self.idle_device)
         self.model_is_idle = True
 
@@ -136,22 +137,10 @@ class VAEManager(MFModelWrapper):
             model.enable_slicing()
         else:
             model.disable_slicing()
-        if self.training_config["mode"] == "train":
-            train_enc = self.training_config["train_encoder"]
-            train_dec = self.training_config["train_decoder"]
-            assert train_enc or train_dec
-            if not train_enc:
-                model.encoder.eval()
-                model.encoder.train = lambda x: x
-            if not train_dec:
-                model.decoder.eval()
-                model.decoder.train = lambda x: x
     
-    def create_optimizer(self, model=None, lr_override=None):
+    def create_optimizer(self, model=None, lr_override=None, train_enc=True, train_dec=True):
         if model is None:
             model = self.model
-        train_enc = self.training_config["train_encoder"]
-        train_dec = self.training_config["train_decoder"]
         if train_enc and train_dec:
             params = model.parameters()
         elif train_enc:
@@ -159,12 +148,6 @@ class VAEManager(MFModelWrapper):
         elif train_dec:
             params = model.decoder.parameters()
         return make_optimizer(params, self.training_config, lr_override)
-    
-    def do_train_encoder(self):
-        return self.training_config["train_encoder"]
-    
-    def do_train_decoder(self):
-        return self.training_config["train_decoder"]
 
 def make_optimizer(params, config, lr_override=None):
     optimizer_config = config["optimizer"]
