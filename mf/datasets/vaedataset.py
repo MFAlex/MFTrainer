@@ -8,6 +8,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import random
 
+import PIL.Image
+PIL.Image.MAX_IMAGE_PIXELS = None
+
 class MFVAEDataset(Dataset):
     def __init__(self, global_path, config):
         if "subfolder" in config and config["subfolder"] != "":

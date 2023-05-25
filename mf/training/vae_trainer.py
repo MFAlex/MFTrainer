@@ -20,6 +20,7 @@ class VAETraining:
         self.repeats = training_params["repeats"] if "repeats" in training_params else 0
         self.train_enc = training_params["train_encoder"]
         self.train_dec = training_params["train_decoder"]
+        self.autocast = training_params["autocasting"]
 
     def train(self):
         self.dataset.next_epoch()
@@ -40,18 +41,19 @@ class VAETraining:
         # This literally won't work without xformers for some reason
         vae.set_use_memory_efficient_attention_xformers(True)
 
-        optimizer = vae_wrapper.get_optimizer(train_enc=self.train_enc, train_dec=self.train_dec)
+        optimizer = vae_wrapper.create_optimizer(train_enc=self.train_enc, train_dec=self.train_dec)
         steps_pbar = tqdm(range(len(self.dataset) * (self.repeats + 1)), position=0, leave=False, dynamic_ncols=True)
         for _ in range(self.repeats + 1):
             accum_loss = None
             accumed_steps = 0
             for step, batch in enumerate(dataloader):
                 image_tensor = batch["image"].to(memory_format=torch.contiguous_format,dtype=vae_wrapper.get_datatype()).to(vae_wrapper.get_device())
-                # Forward pass
-                model_pred = self._encode_and_decode(image_tensor, self.train_enc, self.train_dec)
+                with torch.autocast(vae_wrapper.get_device_type()) if self.autocast else nullcontext():
+                    # Forward pass
+                    model_pred = self._encode_and_decode(image_tensor, self.train_enc, self.train_dec)
+                    # Calculate loss
+                    loss = F.mse_loss(model_pred.float(), image_tensor.float(), reduction="mean")
 
-                # Calculate loss
-                loss = F.mse_loss(model_pred.float(), image_tensor.float(), reduction="mean")
                 if accum_loss is None:
                     accum_loss = loss
                 else:
@@ -188,6 +190,7 @@ class VAE_Validation:
 
         vae_wrapper = self.models.get_vae()
         vae = vae_wrapper.get_model()
+        vae.eval()
         total_loss = 0
         for batch in tqdm(dataloader):
             image_tensor = batch["image"].to(memory_format=torch.contiguous_format,dtype=vae_wrapper.get_datatype()).to(vae_wrapper.get_device())
@@ -195,7 +198,7 @@ class VAE_Validation:
                 predicted = self._encode_and_decode(vae, image_tensor)
                 loss = F.mse_loss(predicted.float(), image_tensor.float(), reduction="mean").detach().item()
                 total_loss += loss
-        print("Total validation loss:", total_loss)
+        print(f"Total validation loss: {total_loss} over {len(dataloader)} items")
         vae_wrapper.set_model_idle()
 
     def _encode_and_decode(self, model, image_tensor):

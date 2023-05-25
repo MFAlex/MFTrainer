@@ -6,6 +6,9 @@ import mf.model_utils as utils
 import os
 import argparse
 
+import PIL.Image
+PIL.Image.MAX_IMAGE_PIXELS = None
+
 from mf.training.vae_trainer import VAETraining, VAE_LearingRate, VAE_Validation
 
 def do_task(task, model_holder, datasets, out_model_path):
@@ -49,10 +52,10 @@ def train(config_file_path, model_path, out_model_path, dataset_path):
         out_model_path = model_path
 
     # Load hardware definitions
-    hardware["cpu"] = torch.device("cpu") #always have CPU available by default
+    hardware["cpu"] = (torch.device("cpu"), "cpu") #always have CPU available by default
     for key in config["hardware"].keys():
         if config["hardware"][key]["type"] == "cuda":
-            hardware[key] = torch.device(f"cuda:{config['hardware'][key]['gpuid']}")
+            hardware[key] = (torch.device(f"cuda:{config['hardware'][key]['gpuid']}"), "cuda")
 
     # Load models
     needed_models = list(config["models"].keys())

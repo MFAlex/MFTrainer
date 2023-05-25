@@ -2,17 +2,15 @@
     "comment": "This is the training config for MFTrainer",
     "models": {
         "vae": {
-            "mode": "train",
             "location": "gpu",
             "data_type": "float32",
-            "cpu_when_idle": true,
             "optimizer": {
                 "type": "lion-pytorch",
                 "weight_decay": 0.100,
                 "lr": 5e-5
             },
             "optimizations": {
-                "slicing": true
+                "slicing": false
             }
         }
     },
@@ -54,7 +52,8 @@
                         "dataset_workers": 4,
                         "repeats": 0,
                         "train_encoder": false,
-                        "train_decoder": true
+                        "train_decoder": true,
+                        "autocasting": true
                     }
                 },
                 {

@@ -69,7 +69,6 @@ class ModelHolder:
 
 class MFModelWrapper:
     def __init__(self, path, hardware, type, training_config):
-        assert training_config["mode"] in ["train", "eval"]
         self.path = path
         self.type = type
         self.loaded_model = False
@@ -87,33 +86,26 @@ class MFModelWrapper:
             self.model = utils.load_model(self.path, components=[self.model_type])[0]
             self.loaded_model = True
             self.model_is_idle = True
-            if self.training_config["mode"] == "train":
-                self.model.train()
-            elif self.training_config["mode"] == "eval":
-                self.model.eval()
             self.init_hooks(self.model)
         if self.model_is_idle:
             logging.debug(f"Moving module {self.type} from cpu to {self.training_config['location']}")
-            self.model.to(self.device, dtype=self.dtype)
+            self.model.to(self.device[0])
             self.model_is_idle = False
         if self.model.dtype != self.dtype:
             self.model.to(dtype=self.dtype)
         return self.model
     
-    def get_optimizer(self):
-        # TODO save/load optimizer states?
-        if self.optimizer is None:
-            self.optimizer = self.create_optimizer()
-        return self.optimizer
-    
     def set_model_idle(self):
         logging.debug(f"Moving module {self.type} from {self.training_config['location']} to cpu")
         self.model.eval()
-        self.model.to(self.idle_device)
+        self.model.to(self.idle_device[0])
         self.model_is_idle = True
 
     def get_device(self):
-        return self.device
+        return self.device[0]
+    
+    def get_device_type(self):
+        return self.device[1]
     
     def get_datatype(self):
         return self.dtype
